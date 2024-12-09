@@ -5,17 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"video-service/models"
 	"video-service/utils"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type VideoService struct {
@@ -67,20 +66,37 @@ func (vs *VideoService) GetVideoMetadata(id string) (*models.VideoMetadata, erro
 	return &metadata, nil
 }
 
-// UploadToS3 uploads a file to AWS S3
-func (vs *VideoService) UploadToS3(fileName string, file io.Reader) (string, error) {
-	// Upload file to S3
-	result, err := vs.Uploader.Upload(context.TODO(), &s3.PutObjectInput{
-		Bucket:      aws.String(vs.Bucket),
-		Key:         aws.String(fileName),
-		Body:        file,
-		ContentType: aws.String("video/mp4"), // Adjust as needed
-		ACL:         types.ObjectCannedACLPublicRead, // Optional: Use private for restricted access
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to upload file to S3: %w", err)
+// ProcessAndUploadVideo handles S3 upload and duration calculation
+func (vs *VideoService) ProcessAndUploadVideo(fileName, contentType string, file io.Reader) (string, int, error) {
+	// Ensure the content type is a video
+	if !utils.IsVideoContentType(contentType) {
+		return "", 0, fmt.Errorf("unsupported file type: %s", contentType)
 	}
 
-	// Return the public URL of the uploaded file
-	return result.Location, nil
+	// Upload the video to S3
+	result, err := vs.Uploader.Upload(context.TODO(), &s3.PutObjectInput{
+		Bucket:      &vs.Bucket,
+		Key:         &fileName,
+		Body:        file,
+		ContentType: &contentType,
+		ACL:         "public-read",
+	})
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to upload to S3: %w", err)
+	}
+
+	// Save the file temporarily to calculate duration
+	tmpFilePath, err := utils.SaveTemporaryFile(fileName, file)
+	if err != nil {
+		return result.Location, 0, fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	defer os.Remove(tmpFilePath)
+
+	// Calculate video duration using ffprobe
+	duration, err := utils.CalculateVideoDuration(tmpFilePath)
+	if err != nil {
+		return result.Location, 0, fmt.Errorf("failed to calculate video duration: %w", err)
+	}
+
+	return result.Location, duration, nil
 }

@@ -6,6 +6,8 @@ import (
 	"video-service/models"
 	"video-service/services"
 
+	"video-service/utils"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,41 +20,56 @@ func NewVideoController(service *services.VideoService) *VideoController {
 	return &VideoController{Service: service}
 }
 
-// UploadVideo handles video uploads and saves metadata
 func (vc *VideoController) UploadVideo(c *gin.Context) {
-	// Retrieve file from request
-	file, header, err := c.Request.FormFile("file")
+	// Validate title
+	title, err := utils.ValidateRequiredField(c, "title", "Title is required")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to retrieve file"})
+		utils.RespondWithError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Validate and retrieve file
+	file, header, err := utils.ValidateFile(c, "file")
+	if err != nil {
+		utils.RespondWithError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer file.Close()
 
-	// Upload to AWS S3 via service
-	fileName := header.Filename
-	url, err := vc.Service.UploadToS3(fileName, file)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+	// Extract content type
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" {
+		utils.RespondWithError(c, http.StatusBadRequest, "Content-Type is required")
 		return
 	}
 
-	// Save metadata in MongoDB via service
-	metadata := models.VideoMetadata{
-		Title:       c.PostForm("title"),
+	// Upload to S3 and calculate video duration
+	fileName := header.Filename
+	url, duration, err := vc.Service.ProcessAndUploadVideo(fileName, contentType, file)
+	if err != nil {
+		utils.RespondWithError(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Save metadata
+	err = vc.Service.SaveVideoMetadata(models.VideoMetadata{
+		Title:       title,
 		Tags:        c.PostFormArray("tags"),
-		Duration:    0, // Add logic to calculate duration
+		Duration:    duration,
 		URL:         url,
 		UploadedAt:  time.Now(),
-		ContentType: header.Header.Get("Content-Type"),
-	}
-
-	err = vc.Service.SaveVideoMetadata(metadata)
+		ContentType: contentType,
+	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to save metadata")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Video uploaded successfully", "url": url, "metadata": metadata})
+	utils.RespondWithSuccess(c, http.StatusOK, gin.H{
+		"message":  "Video uploaded successfully",
+		"url":      url,
+		"metadata": "metadata saved successfully",
+	})
 }
 
 // GetMetadata retrieves video metadata from MongoDB
