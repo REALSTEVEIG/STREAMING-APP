@@ -48,7 +48,7 @@ func (vc *VideoController) UploadVideo(c *gin.Context) {
 
 	err = vc.Service.SaveVideoMetadata(metadata)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save metadata"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
