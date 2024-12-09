@@ -32,7 +32,7 @@ func (vc *VideoController) UploadVideo(c *gin.Context) {
 	fileName := header.Filename
 	url, err := vc.Service.UploadToS3(fileName, file)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload video"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 

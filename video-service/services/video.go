@@ -37,7 +37,7 @@ func NewVideoService(client *mongo.Client) (*VideoService, error) {
 	uploader := manager.NewUploader(s3Client)
 
 	return &VideoService{
-		DB:       client.Database("video_service"),
+		DB:       client.Database("video_service_meta"),
 		S3Client: s3Client,
 		Bucket:   utils.GetEnv("AWS_S3_BUCKET", ""),
 		Uploader: uploader,
