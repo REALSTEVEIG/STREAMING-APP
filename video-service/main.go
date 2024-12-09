@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"log"
+	"video-service/controllers"
 	"video-service/routes"
+	"video-service/services"
 	"video-service/utils"
 
 	"github.com/gin-gonic/gin"
@@ -22,13 +24,22 @@ func main() {
 		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
 
+	// Initialize VideoService
+	videoService, err := services.NewVideoService(client)
+	if err != nil {
+		log.Fatalf("Failed to initialize VideoService: %v", err)
+	}
+
+	// Initialize VideoController
+	videoController := controllers.NewVideoController(videoService)
+
 	// Create Gin router
 	router := gin.Default()
 
-	// Register video routes
-	routes.RegisterVideoRoutes(router, client)
+	// Register routes
+	routes.RegisterVideoRoutes(router, videoController)
 
-	// Start server
+	// Start the server
 	log.Println("Starting server on port 8080...")
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

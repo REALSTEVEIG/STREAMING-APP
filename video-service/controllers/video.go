@@ -28,10 +28,9 @@ func (vc *VideoController) UploadVideo(c *gin.Context) {
 	}
 	defer file.Close()
 
-	// Upload to Azure Blob via service
-	containerName := "videos"
+	// Upload to AWS S3 via service
 	fileName := header.Filename
-	url, err := vc.Service.UploadToAzureBlob(containerName, fileName, file)
+	url, err := vc.Service.UploadToS3(fileName, file)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload video"})
 		return
