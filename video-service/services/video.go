@@ -14,6 +14,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -54,8 +55,14 @@ func (vs *VideoService) SaveVideoMetadata(metadata models.VideoMetadata) error {
 func (vs *VideoService) GetVideoMetadata(id string) (*models.VideoMetadata, error) {
 	collection := vs.DB.Collection("videos")
 
+	// Convert the id string to a MongoDB ObjectID
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, errors.New("invalid video ID format")
+	}
+
 	var metadata models.VideoMetadata
-	err := collection.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&metadata)
+	err = collection.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&metadata)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, errors.New("metadata not found")
