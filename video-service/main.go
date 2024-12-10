@@ -15,6 +15,7 @@ import (
 
 func main() {
 	// Load environment variables
+	
 	utils.LoadEnv()
 
 	// Initialize MongoDB connection
