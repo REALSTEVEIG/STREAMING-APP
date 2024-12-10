@@ -28,9 +28,12 @@ The **Video Service** is a high-performance backend service built with Go (Golan
 Create a `.env` file in the root directory with the following variables:
 
 ```env
-AWS_REGION=<your-aws-region>
-AWS_S3_BUCKET=<your-s3-bucket-name>
-MONGO_URI=mongodb://localhost:27017
+MONGO_URI=mongodb://localhost:27017/xxxxxx
+AWS_ACCESS_KEY_ID=xxxxxx
+AWS_SECRET_ACCESS_KEY=xxxxxxx
+AWS_REGION=eu-north-1
+AWS_S3_BUCKET=xxxxx
+
 ```
 
 ---
