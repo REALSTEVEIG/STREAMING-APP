@@ -1,0 +1,83 @@
+basePath: /api/videos
+host: localhost:8080
+info:
+  contact: {}
+  description: API for video uploads and metadata management
+  title: Video Service API
+  version: "1.0"
+paths:
+  /{id}:
+    get:
+      description: Retrieves video metadata by ID
+      parameters:
+      - description: Video ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get video metadata
+      tags:
+      - videos
+  /upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Uploads a video to S3 and saves its metadata
+      parameters:
+      - description: Video title
+        in: formData
+        name: title
+        required: true
+        type: string
+      - collectionFormat: csv
+        description: Video tags
+        in: formData
+        items:
+          type: string
+        name: tags
+        type: array
+      - description: Video file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Upload a video
+      tags:
+      - videos
+swagger: "2.0"

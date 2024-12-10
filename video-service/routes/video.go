@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterVideoRoutes(router *gin.Engine, videoController *controllers.VideoController) {
+func RegisterVideoRoutes(router gin.IRouter, videoController *controllers.VideoController) {
 	router.POST("/upload", videoController.UploadVideo)
-	router.GET("/metadata/:id", videoController.GetMetadata)
+	router.GET("/:id", videoController.GetMetadata)
 }

@@ -20,6 +20,18 @@ func NewVideoController(service *services.VideoService) *VideoController {
 	return &VideoController{Service: service}
 }
 
+// @Summary Upload a video
+// @Description Uploads a video to S3 and saves its metadata
+// @Tags videos
+// @Accept multipart/form-data
+// @Produce json
+// @Param title formData string true "Video title"
+// @Param tags formData []string false "Video tags"
+// @Param file formData file true "Video file"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /upload [post]
 func (vc *VideoController) UploadVideo(c *gin.Context) {
 	// Validate title
 	title, err := utils.ValidateRequiredField(c, "title", "Title is required")
@@ -72,7 +84,15 @@ func (vc *VideoController) UploadVideo(c *gin.Context) {
 	})
 }
 
-// GetMetadata retrieves video metadata from MongoDB
+// @Summary Get video metadata
+// @Description Retrieves video metadata by ID
+// @Tags videos
+// @Produce json
+// @Param id path string true "Video ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /{id} [get]
 func (vc *VideoController) GetMetadata(c *gin.Context) {
 	id := c.Param("id")
 
