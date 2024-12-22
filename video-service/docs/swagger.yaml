@@ -40,7 +40,7 @@ paths:
     post:
       consumes:
       - multipart/form-data
-      description: Uploads a video to S3 and saves its metadata
+      description: Uploads a video and optional thumbnail to S3 and saves metadata
       parameters:
       - description: Video title
         in: formData
@@ -58,6 +58,10 @@ paths:
         in: formData
         name: file
         required: true
+        type: file
+      - description: Thumbnail (video or image)
+        in: formData
+        name: thumbnail
         type: file
       produces:
       - application/json

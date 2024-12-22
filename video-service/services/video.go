@@ -107,3 +107,22 @@ func (vs *VideoService) ProcessAndUploadVideo(fileName, contentType string, file
 
 	return result.Location, duration, nil
 }
+
+func (vs *VideoService) UploadThumbnail(fileName, contentType string, file io.Reader) (string, error) {
+	if !utils.IsVideoContentType(contentType) && !utils.IsImageContentType(contentType) {
+		return "", fmt.Errorf("invalid thumbnail type: %s", contentType)
+	}
+
+	result, err := vs.Uploader.Upload(context.TODO(), &s3.PutObjectInput{
+		Bucket:      &vs.Bucket,
+		Key:         &fileName,
+		Body:        file,
+		ContentType: &contentType,
+		ACL:         "public-read",
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to upload thumbnail: %w", err)
+	}
+
+	return result.Location, nil
+}

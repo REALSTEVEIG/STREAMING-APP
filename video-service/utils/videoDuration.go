@@ -20,7 +20,18 @@ func IsVideoContentType(contentType string) bool {
 	return false
 }
 
-// CalculateVideoDuration calculates the duration of a video file in seconds
+// IsImageContentType checks if the content type represents an Image
+func IsImageContentType(contentType string) bool {
+	imageContentTypes := []string{"image/jpeg", "image/png", "image/webp"}
+	for _, v := range imageContentTypes {
+		if contentType == v {
+			return true
+		}
+	}
+	return false
+}
+
+// CalculateVideoDuration ca`lculates the duration of a video file in seconds
 func CalculateVideoDuration(filePath string) (int, error) {
 	// Run ffprobe to get video metadata
 	cmd := exec.Command("ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", filePath)

@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/upload": {
             "post": {
-                "description": "Uploads a video to S3 and saves its metadata",
+                "description": "Uploads a video and optional thumbnail to S3 and saves metadata",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -52,6 +52,12 @@ const docTemplate = `{
                         "name": "file",
                         "in": "formData",
                         "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Thumbnail (video or image)",
+                        "name": "thumbnail",
+                        "in": "formData"
                     }
                 ],
                 "responses": {

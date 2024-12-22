@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"mime/multipart"
 	"net/http"
 	"time"
 	"video-service/models"
@@ -21,56 +22,78 @@ func NewVideoController(service *services.VideoService) *VideoController {
 }
 
 // @Summary Upload a video
-// @Description Uploads a video to S3 and saves its metadata
+// @Description Uploads a video and optional thumbnail to S3 and saves metadata
 // @Tags videos
 // @Accept multipart/form-data
 // @Produce json
 // @Param title formData string true "Video title"
 // @Param tags formData []string false "Video tags"
 // @Param file formData file true "Video file"
+// @Param thumbnail formData file false "Thumbnail (video or image)"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /upload [post]
 func (vc *VideoController) UploadVideo(c *gin.Context) {
-	// Validate title
 	title, err := utils.ValidateRequiredField(c, "title", "Title is required")
 	if err != nil {
 		utils.RespondWithError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	// Validate and retrieve file
-	file, header, err := utils.ValidateFile(c, "file")
+	videoFile, videoHeader, err := utils.ValidateFile(c, "file")
 	if err != nil {
 		utils.RespondWithError(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	defer file.Close()
+	defer videoFile.Close()
 
-	// Extract content type
-	contentType := header.Header.Get("Content-Type")
-	if contentType == "" {
-		utils.RespondWithError(c, http.StatusBadRequest, "Content-Type is required")
-		return
+	// Validate thumbnail file (optional)
+	var thumbnailFile multipart.File
+	var thumbnailHeader *multipart.FileHeader
+	thumbnailType := ""
+	thumbnailURL := ""
+
+	if c.Request.MultipartForm != nil {
+		thumbnailFile, thumbnailHeader, _ = c.Request.FormFile("thumbnail")
+		if thumbnailFile != nil {
+			defer thumbnailFile.Close()
+			thumbnailType = thumbnailHeader.Header.Get("Content-Type")
+
+			// Validate thumbnail type
+			if !utils.IsVideoContentType(thumbnailType) && !utils.IsImageContentType(thumbnailType) {
+				utils.RespondWithError(c, http.StatusBadRequest, "Invalid thumbnail type: must be an image or a video")
+				return
+			}
+		}
 	}
 
-	// Upload to S3 and calculate video duration
-	fileName := header.Filename
-	url, duration, err := vc.Service.ProcessAndUploadVideo(fileName, contentType, file)
+	// Process and upload video
+	videoURL, duration, err := vc.Service.ProcessAndUploadVideo(videoHeader.Filename, videoHeader.Header.Get("Content-Type"), videoFile)
 	if err != nil {
 		utils.RespondWithError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
+	// Process and upload thumbnail if provided
+	if thumbnailFile != nil {
+		thumbnailURL, err = vc.Service.UploadThumbnail(thumbnailHeader.Filename, thumbnailType, thumbnailFile)
+		if err != nil {
+			utils.RespondWithError(c, http.StatusInternalServerError, "Failed to upload thumbnail")
+			return
+		}
+	}
+
 	// Save metadata
 	err = vc.Service.SaveVideoMetadata(models.VideoMetadata{
-		Title:       title,
-		Tags:        c.PostFormArray("tags"),
-		Duration:    duration,
-		URL:         url,
-		UploadedAt:  time.Now(),
-		ContentType: contentType,
+		Title:         title,
+		Tags:          c.PostFormArray("tags"),
+		Duration:      duration,
+		URL:           videoURL,
+		Thumbnail:     thumbnailURL,
+		ThumbnailType: thumbnailType,
+		UploadedAt:    time.Now(),
+		ContentType:   videoHeader.Header.Get("Content-Type"),
 	})
 	if err != nil {
 		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to save metadata")
@@ -78,9 +101,10 @@ func (vc *VideoController) UploadVideo(c *gin.Context) {
 	}
 
 	utils.RespondWithSuccess(c, http.StatusOK, gin.H{
-		"message":  "Video uploaded successfully",
-		"url":      url,
-		"metadata": "metadata saved successfully",
+		"message":        "Video uploaded successfully",
+		"url":            videoURL,
+		"thumbnail_url":  thumbnailURL,
+		"metadata":       "metadata saved successfully",
 	})
 }
 
