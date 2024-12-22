@@ -1,10 +1,9 @@
 package controllers
 
 import (
+	"fmt"
 	"mime/multipart"
 	"net/http"
-	"time"
-	"video-service/models"
 	"video-service/services"
 
 	"video-service/utils"
@@ -35,77 +34,66 @@ func NewVideoController(service *services.VideoService) *VideoController {
 // @Failure 500 {object} map[string]interface{}
 // @Router /upload [post]
 func (vc *VideoController) UploadVideo(c *gin.Context) {
-	title, err := utils.ValidateRequiredField(c, "title", "Title is required")
-	if err != nil {
-		utils.RespondWithError(c, http.StatusBadRequest, err.Error())
-		return
-	}
+    title, err := utils.ValidateRequiredField(c, "title", "Title is required")
+    if err != nil {
+        utils.RespondWithError(c, http.StatusBadRequest, err.Error())
+        return
+    }
 
-	videoFile, videoHeader, err := utils.ValidateFile(c, "file")
-	if err != nil {
-		utils.RespondWithError(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	defer videoFile.Close()
+    videoFile, videoHeader, err := utils.ValidateFile(c, "file")
+    if err != nil {
+        utils.RespondWithError(c, http.StatusBadRequest, err.Error())
+        return
+    }
+    defer videoFile.Close()
 
-	// Validate thumbnail file (optional)
-	var thumbnailFile multipart.File
-	var thumbnailHeader *multipart.FileHeader
-	thumbnailType := ""
-	thumbnailURL := ""
+    var thumbnailFile multipart.File
+    var thumbnailHeader *multipart.FileHeader
+    thumbnailType := ""
 
-	if c.Request.MultipartForm != nil {
-		thumbnailFile, thumbnailHeader, _ = c.Request.FormFile("thumbnail")
-		if thumbnailFile != nil {
-			defer thumbnailFile.Close()
-			thumbnailType = thumbnailHeader.Header.Get("Content-Type")
+    if c.Request.MultipartForm != nil {
+        thumbnailFile, thumbnailHeader, _ = c.Request.FormFile("thumbnail")
+        if thumbnailFile != nil {
+            defer thumbnailFile.Close()
+            thumbnailType = thumbnailHeader.Header.Get("Content-Type")
+            if !utils.IsVideoContentType(thumbnailType) && !utils.IsImageContentType(thumbnailType) {
+                utils.RespondWithError(c, http.StatusBadRequest, "Invalid thumbnail type: must be an image or a video")
+                return
+            }
+        }
+    }
 
-			// Validate thumbnail type
-			if !utils.IsVideoContentType(thumbnailType) && !utils.IsImageContentType(thumbnailType) {
-				utils.RespondWithError(c, http.StatusBadRequest, "Invalid thumbnail type: must be an image or a video")
-				return
-			}
-		}
-	}
+    videoURL, duration, err := vc.Service.ProcessAndUploadVideo(videoHeader.Filename, videoHeader.Header.Get("Content-Type"), videoFile)
+    if err != nil {
+        utils.RespondWithError(c, http.StatusInternalServerError, err.Error())
+        return
+    }
 
-	// Process and upload video
-	videoURL, duration, err := vc.Service.ProcessAndUploadVideo(videoHeader.Filename, videoHeader.Header.Get("Content-Type"), videoFile)
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, err.Error())
-		return
-	}
+    thumbnailURL := ""
+    if thumbnailFile != nil {
+        thumbnailURL, err = vc.Service.UploadThumbnail(thumbnailHeader.Filename, thumbnailType, thumbnailFile)
+        if err != nil {
+            utils.RespondWithError(c, http.StatusInternalServerError, "Failed to upload thumbnail")
+            return
+        }
+    }
 
-	// Process and upload thumbnail if provided
-	if thumbnailFile != nil {
-		thumbnailURL, err = vc.Service.UploadThumbnail(thumbnailHeader.Filename, thumbnailType, thumbnailFile)
-		if err != nil {
-			utils.RespondWithError(c, http.StatusInternalServerError, "Failed to upload thumbnail")
-			return
-		}
-	}
+    res, err := vc.Service.CreateAndSaveMetadata(title, c.PostFormArray("tags"), duration, videoURL, thumbnailURL, thumbnailType, videoHeader.Header.Get("Content-Type"))
+    if err != nil {
+        utils.RespondWithError(c, http.StatusInternalServerError, "Failed to save metadata")
+        return
+    }
 
-	// Save metadata
-	err = vc.Service.SaveVideoMetadata(models.VideoMetadata{
-		Title:         title,
-		Tags:          c.PostFormArray("tags"),
-		Duration:      duration,
-		URL:           videoURL,
-		Thumbnail:     thumbnailURL,
-		ThumbnailType: thumbnailType,
-		UploadedAt:    time.Now(),
-		ContentType:   videoHeader.Header.Get("Content-Type"),
-	})
-	if err != nil {
-		utils.RespondWithError(c, http.StatusInternalServerError, "Failed to save metadata")
-		return
-	}
+	fmt.Println("res", res);
 
-	utils.RespondWithSuccess(c, http.StatusOK, gin.H{
-		"message":        "Video uploaded successfully",
-		"url":            videoURL,
-		"thumbnail_url":  thumbnailURL,
-		"metadata":       "metadata saved successfully",
-	})
+    utils.RespondWithSuccess(c, http.StatusOK, gin.H{
+        "message":        "Video uploaded successfully",
+		"id": res.ID.Hex(),
+		"title": res.Title,
+        "url":            res.URL,
+        "thumbnail_url":  res.Thumbnail,
+		"tags": res.Tags,
+    })
 }
 
 // @Summary Get video metadata

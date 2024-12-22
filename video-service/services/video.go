@@ -8,6 +8,7 @@ import (
 	"os"
 	"video-service/models"
 	"video-service/utils"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -44,11 +45,35 @@ func NewVideoService(client *mongo.Client) (*VideoService, error) {
 	}, nil
 }
 
-// SaveVideoMetadata saves video metadata to MongoDB
-func (vs *VideoService) SaveVideoMetadata(metadata models.VideoMetadata) error {
-	collection := vs.DB.Collection("videos")
-	_, err := collection.InsertOne(context.TODO(), metadata)
-	return err
+func (vs *VideoService) SaveVideoMetadata(metadata models.VideoMetadata) (models.VideoMetadata, error) {
+    collection := vs.DB.Collection("videos")
+    result, err := collection.InsertOne(context.TODO(), metadata)
+    if err != nil {
+        return metadata, err
+    }
+
+    // Assert that the InsertedID is of type primitive.ObjectID
+    if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+        metadata.ID = oid // Assign the ObjectID to the metadata struct
+    } else {
+        return metadata, fmt.Errorf("failed to cast InsertedID to ObjectID")
+    }
+
+    return metadata, nil
+}
+
+func (vs *VideoService) CreateAndSaveMetadata(title string, tags []string, duration int, videoURL, thumbnailURL, thumbnailType, contentType string) (models.VideoMetadata, error) {
+    metadata := models.VideoMetadata{
+        Title:         title,
+        Tags:          tags,
+        Duration:      duration,
+        URL:           videoURL,
+        Thumbnail:     thumbnailURL,
+        ThumbnailType: thumbnailType,
+        UploadedAt:    time.Now(),
+        ContentType:   contentType,
+    }
+	return vs.SaveVideoMetadata(metadata); 
 }
 
 // GetVideoMetadata retrieves video metadata by ID

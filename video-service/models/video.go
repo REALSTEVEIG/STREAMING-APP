@@ -1,9 +1,13 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type VideoMetadata struct {
-	ID            string    `bson:"_id,omitempty"`      // MongoDB ObjectID
+	ID            primitive.ObjectID    `bson:"_id,omitempty"`      // MongoDB ObjectID
 	Title         string    `bson:"title"`             // Video title
 	Tags          []string  `bson:"tags"`              // Tags associated with the video
 	Duration      int       `bson:"duration"`          // Video duration in seconds
